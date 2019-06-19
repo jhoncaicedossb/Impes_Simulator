@@ -75,36 +75,62 @@ int main(){
     //Leer la malla de gmsh
 TPZGmshReader read;
 read.SetFormatVersion("3");
+    
 TPZGeoMesh *gmesh;
 // crea malla geometrica
-gmesh = read.GeometricGmshMesh("malla1.msh");
+gmesh = read.GeometricGmshMesh("malla1.msh"); //nombre del archivo a leer
+    gmesh->BuildConnectivity();
 std::ofstream archivo("malla_comp.vtk");
-TPZVTKGeoMesh::PrintGMeshVTK(gmesh, archivo);
+//TPZVTKGeoMesh::PrintGMeshVTK(gmesh, archivo);
 
 //crea malla computacional
 TPZCompMesh *cmesh = GenerateCompMesh(gmesh);
 TPZVTKGeoMesh::PrintCMeshVTK(cmesh,archivo);
 
+    
+    
 //crear analysis 
 TPZAnalysis *an = new TPZAnalysis(cmesh, true);
-std::cout<<"OK"<<std::endl;
-TPZSkylineStructMatrix matrix(cmesh);
-matrix.SetNumThreads(4);
-TPZStepSolver<STATE> step;
-step.SetDirect(ECholesky);
-an->SetSolver(step);
-
-an->SetStructuralMatrix(matrix);
-
+    TPZSkylineStructMatrix matrix(cmesh);
+    //        TPZSkylineStructMatrix matrix(cmesh);
+    matrix.SetNumThreads(4);
+    an->SetStructuralMatrix(matrix);
+    TPZStepSolver<STATE> step;
+    step.SetDirect(ELDLt);
+    an->SetSolver(step);
+    
+    
+    
+//    TPZStepSolver<STATE> step;
+//    step.SetDirect(ECholesky);
+//    an->SetSolver(step);
+    
+//ensamblaje
+    an->Assemble();
+    
+//solucion
 an->Solve();
+    
+    
+//posprocesamiento
+    TPZStack<std::string,10> scalnames, vecnames;
+    vecnames.Push("Flux");
+    scalnames.Push("Pressure");
+    //  scalnames.Push("Permeability");
+    
+    int div = 0;
+    int dim=gmesh->Dimension();
+    std::string fileresult("TestCaicedo.vtk");
+    an->DefineGraphMesh(dim,scalnames,vecnames,fileresult);
+    an->PostProcess(div,dim);
 
 return 0;
 }
 
 TPZCompMesh *GenerateCompMesh(TPZGeoMesh *gmesh){
     TPZCompMesh *cmesh = new TPZCompMesh(gmesh);
-    TPZMixedDarcyFlow *material = new TPZMixedDarcyFlow(4,2);
-    material->SetPermeability(10);
+    TPZMatPoisson3d *material = new TPZMatPoisson3d(4,2);
+  //  material->SetPermeability(10);
     cmesh->InsertMaterialObject(material);
     //D =0
     //N =2
@@ -125,6 +151,9 @@ TPZCompMesh *GenerateCompMesh(TPZGeoMesh *gmesh){
     cmesh->SetDefaultOrder(1);
 
     cmesh->AutoBuild();
-
-
+    int nel = cmesh->NElements();
+    std::cout<<"nels ="<<nel<<std::endl;
+    cmesh->InitializeBlock();
+    
+    return cmesh;
 }
