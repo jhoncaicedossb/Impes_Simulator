@@ -67,18 +67,19 @@
 #include "pzskylstrmatrix.h"
 
 TPZCompMesh *GenerateCompMesh(TPZGeoMesh *gmesh);
+TPZCompMesh *TransportMesh(TPZGeoMesh *gmesh);
 
 using namespace std;
 
 int main(){
-
+ 
     //Leer la malla de gmsh
 TPZGmshReader read;
-read.SetFormatVersion("3");
+read.SetFormatVersion("4.1");
     
 TPZGeoMesh *gmesh;
 // crea malla geometrica
-gmesh = read.GeometricGmshMesh("malla1.msh"); //nombre del archivo a leer
+gmesh = read.GeometricGmshMesh("caseiii.msh"); //nombre del archivo a leer
     gmesh->BuildConnectivity();
 std::ofstream archivo("malla_comp.vtk");
 //TPZVTKGeoMesh::PrintGMeshVTK(gmesh, archivo);
@@ -88,9 +89,11 @@ TPZCompMesh *cmesh = GenerateCompMesh(gmesh);
 TPZVTKGeoMesh::PrintCMeshVTK(cmesh,archivo);
 
     
-    
+ 
 //crear analysis 
-TPZAnalysis *an = new TPZAnalysis(cmesh, true);
+
+    TPZAnalysis *an = new TPZAnalysis(cmesh, true);
+  std::cout<<"pase"<<std::endl;
     TPZSkylineStructMatrix matrix(cmesh);
     //        TPZSkylineStructMatrix matrix(cmesh);
     matrix.SetNumThreads(4);
@@ -129,24 +132,25 @@ return 0;
 
 TPZCompMesh *GenerateCompMesh(TPZGeoMesh *gmesh){
     TPZCompMesh *cmesh = new TPZCompMesh(gmesh);
-    TPZMatPoisson3d *material = new TPZMatPoisson3d(4,2);
-  //  material->SetPermeability(10);
+    
+    TPZMixedDarcyFlow *material = new TPZMixedDarcyFlow(4,2);
+    material->SetPermeability(10);
     cmesh->InsertMaterialObject(material);
-    //D =0
-    //N =2
+    int D =0;
+    int N =1;
     int dimension=2;
-    TPZFMatrix<STATE> val1(dimension,dimension,0.0), val2(dimension,1,0.0);
+    TPZFMatrix<STATE> val1(dimension,dimension,0.0), val2(dimension,N,0.0);
     val2(0,0)=100;
-    TPZMaterial *bc_inlet = material->CreateBC(material,1,0,val1,val2);
+    TPZMaterial *bc_inlet = material->CreateBC(material,1,D,val1,val2);
     cmesh->InsertMaterialObject(bc_inlet);
     val2(0,0)=0;
-    TPZMaterial *bc_outlet = material->CreateBC(material,2,0,val1,val2);
+    TPZMaterial *bc_outlet = material->CreateBC(material,2,D,val1,val2);
     cmesh->InsertMaterialObject(bc_outlet);
     
     val2(0,0)=0;
-    TPZMaterial *bc_impervious = material->CreateBC(material,3,1,val1,val2);
+    TPZMaterial *bc_impervious = material->CreateBC(material,3,N,val1,val2);
     cmesh->InsertMaterialObject(bc_impervious);
-    
+   
     cmesh->SetAllCreateFunctionsContinuous();
     cmesh->SetDefaultOrder(1);
 
@@ -154,6 +158,15 @@ TPZCompMesh *GenerateCompMesh(TPZGeoMesh *gmesh){
     int nel = cmesh->NElements();
     std::cout<<"nels ="<<nel<<std::endl;
     cmesh->InitializeBlock();
-    
+   
     return cmesh;
+    
+}
+TPZCompMesh *TransportMesh(TPZGeoMesh *gmesh){
+    
+    TPZCompMesh *scmesh = new TPZCompMesh(gmesh);
+    
+    
+    
+    
 }
