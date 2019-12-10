@@ -80,9 +80,22 @@ read.SetFormatVersion("4.1");
 TPZGeoMesh *gmesh;
 // crea malla geometrica
 gmesh = read.GeometricGmshMesh("caseiii.msh"); //nombre del archivo a leer
-    gmesh->BuildConnectivity();
-std::ofstream archivo("malla_comp.vtk");
-//TPZVTKGeoMesh::PrintGMeshVTK(gmesh, archivo);
+    
+    int nel = gmesh->NElements();
+    for (int iel =0; iel<nel; iel++) {
+        TPZGeoEl * gel = gmesh->Element(iel);
+        if(gel->Dimension()!=2){continue;}
+        int rand = random();
+        int valor = rand%2;
+        if ( valor==0) {
+            gel->SetMaterialId(5);
+        }
+        
+    }
+    
+gmesh->BuildConnectivity();
+std::ofstream archivo("malla_COMP.vtk");
+TPZVTKGeoMesh::PrintGMeshVTK(gmesh, archivo);
 
 //crea malla computacional
 TPZCompMesh *cmesh = GenerateCompMesh(gmesh);
@@ -93,8 +106,9 @@ TPZVTKGeoMesh::PrintCMeshVTK(cmesh,archivo);
 //crear analysis 
 
     TPZAnalysis *an = new TPZAnalysis(cmesh, true);
-  std::cout<<"pase"<<std::endl;
-    TPZSkylineStructMatrix matrix(cmesh);
+    std::cout<<"pase"<<std::endl;
+    
+    TPZSymetricSpStructMatrix matrix(cmesh);
     //        TPZSkylineStructMatrix matrix(cmesh);
     matrix.SetNumThreads(4);
     an->SetStructuralMatrix(matrix);
@@ -133,9 +147,23 @@ return 0;
 TPZCompMesh *GenerateCompMesh(TPZGeoMesh *gmesh){
     TPZCompMesh *cmesh = new TPZCompMesh(gmesh);
     
-    TPZMixedDarcyFlow *material = new TPZMixedDarcyFlow(4,2);
-    material->SetPermeability(10);
+    TPZMatPoisson3d *material = new TPZMatPoisson3d(4,2);
+//    material->SetPermeability(10);
+    
+    REAL conv=0;
+    REAL permeability = 100;
+    TPZVec<REAL> convdir(2,0.0);
+    material->SetParameters(permeability, conv, convdir);
     cmesh->InsertMaterialObject(material);
+    
+    TPZMatPoisson3d *material2 = new TPZMatPoisson3d(5,2);
+    REAL conv2=0;
+    REAL permeability2 = 1000;
+    TPZVec<REAL> convdir2(2,0.0);
+    material->SetParameters(permeability2, conv2, convdir2);
+    cmesh->InsertMaterialObject(material2);
+    
+    
     int D =0;
     int N =1;
     int dimension=2;
